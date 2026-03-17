@@ -1,4 +1,4 @@
-// --- VISSZASZÁMLÁLÓ (Marad a régi) ---
+// --- VISSZASZÁMLÁLÓ ---
 const targetDate = new Date("May 4, 2026 08:00:00").getTime();
 function updateTimer() {
     const now = new Date().getTime();
@@ -10,85 +10,122 @@ function updateTimer() {
     document.getElementById("timer").innerHTML = diff < 0 ? "Hazaértünk! 🏠" : `${d}n ${h}ó ${m}p ${s}mp`;
 }
 setInterval(updateTimer, 1000);
+updateTimer();
 
 // --- KALANDJÁTÉK ---
 const canvas = document.getElementById('mazeCanvas');
 const ctx = canvas.getContext('2d');
 
-// Az útvonal pontjai (x, y koordináták)
-const path = [
-    {x: 30, y: 250}, {x: 100, y: 250}, // Start szakasz
-    {x: 100, y: 150}, {x: 200, y: 150}, // Első kanyar
-    {x: 200, y: 50},  {x: 270, y: 50}   // Cél szakasz
-];
+let progress = 0; // 0-tól 100-ig tartó haladás
+let lastTouchX = 0;
 
-let progress = 0; // Mennyit haladtunk az úton (0-100%)
-let currentStop = 0;
+// Megállók és logikai kérdések
 const stops = [
-    { pos: 30, question: "Mennyi 12 + 15?", answer: "27", label: "Zárt kapu 🚪" },
-    { pos: 60, question: "Milyen színű a kutyusod? (barna/fekete/feher)", answer: "fekete", label: "Morgó macska 🐱" },
-    { pos: 85, question: "Hány lába van a kutyának?", answer: "4", label: "Nagy pocsolya 💧" }
+    { pos: 25, q: "Hány szobás lesz az új ház?", a: "3", icon: "🚪" },
+    { pos: 55, q: "Milyen színű a kerítés? (szürke/barna/zöld)", a: "szürke", icon: "🚧" },
+    { pos: 85, q: "Mi a kutyus kedvenc játéka? (labda/csont/pluss)", a: "labda", icon: "🎾" }
 ];
+let completedStops = [];
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Út megrajzolása
-    ctx.strokeStyle = "#444";
-    ctx.lineWidth = 20;
+    
+    // Fix kanyargós útvonal rajzolása (háttér)
+    ctx.beginPath();
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 30;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.beginPath();
-    ctx.moveTo(path[0].x, path[0].y);
-    for(let i=1; i<path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+    ctx.moveTo(30, 250);   // Start
+    ctx.lineTo(130, 250);  // 1. szakasz
+    ctx.lineTo(130, 150);  // 2. szakasz (felfelé)
+    ctx.lineTo(230, 150);  // 3. szakasz (jobbra)
+    ctx.lineTo(230, 50);   // 4. szakasz (felfelé)
+    ctx.lineTo(270, 50);   // Cél
     ctx.stroke();
 
-    // Díszítés (Házak, emberek szimbólumai)
-    ctx.font = "20px serif";
-    ctx.fillText("🏘️", 50, 100);
-    ctx.fillText("🌳", 230, 200);
-    ctx.fillText("🚶", 150, 280);
-    ctx.fillText("🏠", 270, 50);
+    // Út menti díszítés
+    ctx.font = "20px Arial";
+    ctx.fillText("🌳", 50, 210);
+    ctx.fillText("🚶", 160, 260);
+    ctx.fillText("🏘️", 40, 60);
+    ctx.fillText("🏠", 270, 40); // A ház
+    ctx.fillText("🦴", 275, 75); // A jutalom csont a ház előtt
 
-    // Aktuális pozíció kiszámítása az úton
-    let currentX = path[0].x + (path[path.length-1].x - path[0].x) * (progress/100);
-    // (Egyszerűsített mozgás a szemléltetéshez)
-    // Megjegyzés: Ez egy egyenes vonalú közelítés, de a célra megfelel
-    
-    // Kutyus megjelenítése
-    ctx.fillText("🐶", 25 + (progress * 2.4), 250 - (progress * 2)); 
+    // Aktuális pozíció kiszámítása az úton a progress alapján
+    let px, py;
+    if (progress <= 25) { // vízszintesen megy 30-tól 130-ig
+        px = 30 + (progress * 4); py = 250;
+    } else if (progress <= 50) { // függőlegesen fel 250-ről 150-ig
+        px = 130; py = 250 - ((progress - 25) * 4);
+    } else if (progress <= 75) { // vízszintesen jobbra 130-tól 230-ig
+        px = 130 + ((progress - 50) * 4); py = 150;
+    } else { // függőlegesen fel 150-ről 50-ig, majd kicsit jobbra
+        px = 230 + ((progress - 75) * 1.6); py = 150 - ((progress - 75) * 4);
+    }
 
-    // Megállók jelzése
+    // Akadályok megjelenítése, ha még nem értünk oda
     stops.forEach(s => {
-        if (progress < s.pos) ctx.fillText(s.label, 25 + (s.pos * 2.2), 250 - (s.pos * 1.8));
+        if (!completedStops.includes(s.pos)) {
+            ctx.fillText(s.icon, 100, 100); // Ez csak egy példa, a rajzolás bonyolultabb, maradjunk a jelzésnél:
+            ctx.fillStyle = "red";
+            ctx.beginPath();
+            ctx.arc(130, 200, 5, 0, Math.PI*2); // Megálló pontok a kanyarokban
+            ctx.fillStyle = "white";
+        }
     });
+
+    // Kutyus rajzolása
+    ctx.font = "30px Arial";
+    ctx.fillText("🐶", px - 15, py + 10);
 }
 
-function move() {
-    if (progress < 100) {
-        let nextStop = stops.find(s => Math.abs(progress - s.pos) < 1);
+// Swipe kezelése
+function handleMove(currentX) {
+    if (progress >= 100) return;
+
+    let diff = currentX - lastTouchX;
+    if (diff > 2) { // Csak ha jobbra/előre húzzuk
         
-        if (nextStop && currentStop < stops.indexOf(nextStop) + 1) {
-            let valasz = prompt(nextStop.question);
-            if (valasz && valasz.toLowerCase() === nextStop.answer.toLowerCase()) {
-                currentStop++;
+        // Ellenőrizzük, van-e megálló
+        let nextStop = stops.find(s => progress < s.pos && (progress + 1) >= s.pos);
+        
+        if (nextStop && !completedStops.includes(nextStop.pos)) {
+            let answer = prompt(nextStop.q);
+            if (answer && answer.toLowerCase() === nextStop.a.toLowerCase()) {
+                completedStops.push(nextStop.pos);
                 progress += 2;
             } else {
-                alert("Hoppá, ez nem talált! Próbáld újra.");
+                alert("Hoppá! Gondold át újra!");
                 return;
             }
+        } else {
+            progress += 1;
         }
-        progress += 0.5;
-        draw();
-        requestAnimationFrame(move);
-    } else {
-        alert("Gratulálok! A kutyus szerencsésen haazaért a házba! 🐾");
+    }
+    lastTouchX = currentX;
+    draw();
+
+    if (progress >= 100) {
+        setTimeout(() => alert("Hazaértél! Megkaptad a csontot! 🦴🐾"), 100);
     }
 }
 
-// Indítás gombnyomásra (vagy swipe-ra)
-canvas.onclick = () => {
-    if(progress === 0) move();
-};
+// Touch események mobilra
+canvas.addEventListener('touchstart', e => {
+    lastTouchX = e.touches[0].clientX;
+});
+
+canvas.addEventListener('touchmove', e => {
+    handleMove(e.touches[0].clientX);
+});
+
+// Egér események teszteléshez (gépen)
+canvas.addEventListener('mousedown', e => {
+    lastTouchX = e.clientX;
+    const moveMouse = (me) => handleMove(me.clientX);
+    window.addEventListener('mousemove', moveMouse);
+    window.addEventListener('mouseup', () => window.removeEventListener('mousemove', moveMouse), {once:true});
+});
 
 draw();
