@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Beköltözés Visszaszámláló</title>
+
+  <link rel="icon" type="image/png" href="icon.png">
+
+  <style>
+    /* Mobilbarát stílus */
+    body { 
+      margin: 0; background-color: #000; color: #fff; 
+      font-family: 'Segoe UI', sans-serif; text-align: center; 
+      overflow: hidden; touch-action: none; /* Megakadályozza az oldal görgetését swipe közben */
+    }
+    .container { padding: 20px; }
+    h2 { margin: 10px 0; font-size: 1.5rem; }
+    #timer { 
+      font-size: 1.2rem; color: #ff4d4d; margin-bottom: 15px;
+      border: 1px solid #333; padding: 10px; border-radius: 10px;
+      background: #111; display: inline-block; min-width: 250px;
+    }
+    #game-container {
+      position: relative;
+      display: inline-block;
+      border: 2px solid #444;
+      background-color: #050505;
+      border-radius: 8px;
+    }
+    canvas { display: block; max-width: 90vw; max-height: 50vh; }
+    #reset-btn {
+      margin-top: 15px; background-color: #222; color: #fff;
+      border: 1px solid #555; padding: 12px 24px; border-radius: 8px;
+      font-size: 1rem; cursor: pointer;
+    }
+    .hint { font-size: 0.9rem; color: #666; margin-top: 10px; }
+    #puppy-img { margin-top: 15px; max-width: 120px; border-radius: 50%; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Beköltözés</h2>
+    <div id="timer">Betöltés...</div>
+    
+    <div id="game-container">
+      <canvas id="mazeCanvas" width="300" height="300"></canvas>
+    </div>
+
+    <br>
+    <button id="reset-btn">Új pálya</button>
+    <div class="hint">Húzd az ujjad a kutyus irányításához!</div>
+    <img id="puppy-img" src="image.png" alt="Berni kiskutya">
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
